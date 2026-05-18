@@ -1,0 +1,180 @@
+#include <Adafruit_GPS.h>
+#include <SD.h>
+#include <SPI.h>
+
+#define GPSSerial Serial2
+#define captureControl 28
+
+
+File GPX_000;
+Adafruit_GPS GPS(&GPSSerial);
+
+const int chipSelectSD = BUILTIN_SDCARD;
+const char fileName[13] = "test.gpx";
+bool LogActive = 0;
+
+#define GPSECHO true
+
+uint32_t timer = millis();
+
+void startGPXFile(File &f, const char *fileName){
+  
+  if (f) {
+  
+  //Write Header
+    f.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+    f.println("<gpx xmlns=\"http://www.topografix.com/GPX/1/1\" version=\"1.1\" creator=\"Dillon Mims\" xmlns=\"http://www.topografix.com/GPX/1/1\">");
+ 
+  //Start Route
+    f.println("<rte>");
+    f.print("<name>");
+    f.print(fileName);
+    f.println("</name>");
+    f.print("<desc>");
+    f.print("GPX Tracking");
+    f.println("</desc>");
+    f.print("<number>");
+    f.print("1");
+    f.println("</number>");
+
+  } 
+
+}
+
+void endGPXFile(File &f){
+
+  if (!f) return;
+  f.println("  </rte>");
+  f.println("</gpx>");
+
+  // close the file:
+  f.close();
+}
+
+void writeRoutePoint(File &f, Adafruit_GPS &gps){
+
+  if (!gps.fix) return;
+
+  float lon = (gps.longitudeDegrees);
+  float lat = (gps.latitudeDegrees);
+
+  f.print("  <rtept lat=\""); f.print(lat, 6); f.print("\" lon=\""); f.print(lon, 6); f.println("\">");
+
+  f.print("<ele>"); f.print(GPS.altitude); f.println("</ele>");
+
+ f.print("    <time>20");
+  if (gps.year < 10) f.print('0');
+  f.print(gps.year);
+  f.print('-');
+  if (gps.month < 10) f.print('0');
+  f.print(gps.month);
+  f.print('-');
+  if (gps.day < 10) f.print('0');
+  f.print(gps.day);
+  f.print('T');
+  if (gps.hour < 10) f.print('0');
+  f.print(gps.hour);
+  f.print(':');
+  if (gps.minute < 10) f.print('0');
+  f.print(gps.minute);
+  f.print(':');
+  if (gps.seconds < 10) f.print('0');
+  f.print(gps.seconds);
+  f.println("Z</time>");
+
+  f.println("<name>GPS Waypoint</name>");
+  
+  f.println("</rtept>");
+
+  Serial.println("Logged");
+}
+
+
+
+void setup()
+{
+ // Open serial communications and wait for port to open:
+  Serial.begin(9600);
+
+  pinMode(captureControl, INPUT_PULLUP);
+
+  // 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
+  GPS.begin(9600);
+
+  // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
+  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+
+  // uncomment this line to turn on only the "minimum recommended" data
+  //GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCONLY);
+
+  // For parsing data, we don't suggest using anything but either RMC only or RMC+GGA since
+  // the parser doesn't care about other sentences at this time
+  // Set the update rate
+  GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ); // 1 Hz update rate
+  // For the parsing code to work nicely and have time to sort thru the data, and
+  // print it out we don't suggest using anything higher than 1 Hz
+
+  // Request updates on antenna status, comment out to keep quiet
+  GPS.sendCommand(PGCMD_ANTENNA);
+
+  delay(1000);
+
+  // Ask for firmware version
+  GPSSerial.println(PMTK_Q_RELEASE);
+
+
+  Serial.print("Initializing SD card...");
+
+  if (!SD.begin(chipSelectSD)) {
+    Serial.println("initialization failed!");
+    return;
+  }
+  Serial.println("initialization done.");
+  
+}
+
+void loop()
+{
+
+    char c = GPS.read();                 // grab incoming bytes
+    if (GPS.newNMEAreceived()) {         // got a full NMEA sentence?
+
+      if (!GPS.parse(GPS.lastNMEA())) {  // parse it
+        return;                          // parse failed; wait for next sentence
+      }
+
+	if(LogActive == 1){
+
+
+
+    if (GPS.fix) {
+      writeRoutePoint(GPX_000, GPS);
+      delay(125);
+    }
+    else if(!GPS.fix){
+      Serial.println(GPS.fix);
+    }
+
+  }
+
+
+  if(((digitalRead(captureControl)) == 0 ) && LogActive == 0){
+  delay(250); // Lazy debounce LOL
+  
+  //fileName = "test.gpx";//Change/Add file name generation
+
+  LogActive = 1;
+  GPX_000 = SD.open(fileName, FILE_WRITE);
+  startGPXFile(GPX_000, fileName);
+  }
+
+  if((digitalRead(captureControl) == 0) && (LogActive == 1)){
+      delay(125);
+      LogActive = 0;
+      Serial.println("Log Ending");
+      endGPXFile(GPX_000);
+    }
+    
+}
+}
+
