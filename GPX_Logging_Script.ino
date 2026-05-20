@@ -1,9 +1,24 @@
 #include <Adafruit_GPS.h>
 #include <SD.h>
 #include <SPI.h>
+#include <Audio.h>
+#include <Wire.h>
+#include <SerialFlash.h>
+
+// GUItool: begin automatically generated code
+AudioSynthWaveform       waveform1;      //xy=398,259
+AudioSynthWaveform       waveform2;      //xy=401,297
+AudioEffectDigitalCombine combine1;       //xy=651,273
+AudioOutputI2S2          i2s2_1;         //xy=960,257
+AudioConnection          patchCord1(waveform1, 0, combine1, 0);
+AudioConnection          patchCord2(waveform2, 0, combine1, 1);
+AudioConnection          patchCord3(combine1, 0, i2s2_1, 0);
+AudioConnection          patchCord4(combine1, 0, i2s2_1, 1);
+// GUItool: end automatically generated code
 
 #define GPSSerial Serial2
 #define captureControl 28
+#define max_SD 6
 
 
 File GPX_000;
@@ -39,6 +54,13 @@ bool startGPXFile(File &f, char *fileName){
     f.print("1");
     f.println("</number>");
     Serial.println("Log Started");
+
+    waveform1.amplitude(0.5);
+    waveform2.amplitude(0.5);
+    delay(50);
+    waveform1.amplitude(0);
+    waveform2.amplitude(0);
+
     return 1;
   }
   else{
@@ -55,6 +77,11 @@ void endGPXFile(File &f){
 
   // close the file:
   f.close();
+  waveform1.amplitude(0.5);
+  waveform2.amplitude(0.5);
+  delay(50);
+  waveform1.amplitude(0);
+  waveform2.amplitude(0);
   Serial.println("Log Ended");
 }
 
@@ -104,6 +131,9 @@ void setup()
  // Open serial communications and wait for port to open:
   Serial.begin(9600);
 
+  pinMode(max_SD, OUTPUT);
+  digitalWrite(max_SD, HIGH);
+
   pinMode(captureControl, INPUT_PULLUP);
 
   // 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
@@ -138,7 +168,13 @@ void setup()
     return;
   }
   Serial.println("initialization done.");
-  
+
+  AudioMemory(20);
+  waveform1.frequency(500);
+  waveform1.begin(WAVEFORM_SINE);
+  waveform2.frequency(5000);
+  combine1.setCombineMode(3);
+
 }
 
 void loop()
@@ -176,10 +212,11 @@ void loop()
 
     if (GPS.fix) {
       writeRoutePoint(GPX_000, GPS);
-      delay(125);
     }
     else if(!GPS.fix){
       Serial.println(GPS.fix);
     }
+
   }
+
 }
