@@ -10,14 +10,16 @@ File GPX_000;
 Adafruit_GPS GPS(&GPSSerial);
 
 const int chipSelectSD = BUILTIN_SDCARD;
-const char fileName[13] = "test.gpx";
+char fileName[13] = "";
 bool LogActive = 0;
 
 #define GPSECHO true
 
-uint32_t timer = millis();
+bool btnState = 1;
+bool previousBtnState = 1;
+uint32_t timer = 0;
 
-void startGPXFile(File &f, const char *fileName){
+bool startGPXFile(File &f, char *fileName){
   
   if (f) {
   
@@ -36,8 +38,10 @@ void startGPXFile(File &f, const char *fileName){
     f.print("<number>");
     f.print("1");
     f.println("</number>");
-
-  } 
+    return 1;
+  }else{
+    return 0;
+  }
 
 }
 
@@ -87,6 +91,7 @@ void writeRoutePoint(File &f, Adafruit_GPS &gps){
   f.println("</rtept>");
 
   Serial.println("Logged");
+  delay(250);
 }
 
 
@@ -143,38 +148,22 @@ void loop()
         return;                          // parse failed; wait for next sentence
       }
 
-	if(LogActive == 1){
+  bool btnState = digitalRead(captureControl);
 
-
-
-    if (GPS.fix) {
-      writeRoutePoint(GPX_000, GPS);
-      delay(125);
+  //much thanks to user AndyA on PJRC Forum for helping me clean up my debounce as well as state handling :)
+  if((previousBtnState == 1) && (btnState == 0)){
+    uint32_t now = millis();
+    if((now - timer) > 100){
+      timer = now;
+      if(!LogActive){
+        LogActive = startGPXFile(GPX_000, fileName);
+      }
+      else{
+        endGPXFile(GPX_000);
+        LogActive = 0;
+      }
     }
-    else if(!GPS.fix){
-      Serial.println(GPS.fix);
-    }
-
   }
-
-
-  if(((digitalRead(captureControl)) == 0 ) && LogActive == 0){
-  delay(250); // Lazy debounce LOL
-  
-  //fileName = "test.gpx";//Change/Add file name generation
-
-  LogActive = 1;
-  GPX_000 = SD.open(fileName, FILE_WRITE);
-  startGPXFile(GPX_000, fileName);
-  }
-
-  if((digitalRead(captureControl) == 0) && (LogActive == 1)){
-      delay(125);
-      LogActive = 0;
-      Serial.println("Log Ending");
-      endGPXFile(GPX_000);
-    }
-    
 }
+previousBtnState = btnState;
 }
-
