@@ -147,7 +147,7 @@ void loop()
       if (!GPS.parse(GPS.lastNMEA())) {  // parse it
         return;                          // parse failed; wait for next sentence
       }
-
+    }
   bool btnState = digitalRead(captureControl);
 
   //much thanks to user AndyA on PJRC Forum for helping me clean up my debounce as well as state handling :)
@@ -164,6 +164,5 @@ void loop()
       }
     }
   }
-}
 previousBtnState = btnState;
 }
