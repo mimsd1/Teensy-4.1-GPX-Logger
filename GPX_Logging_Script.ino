@@ -35,7 +35,10 @@ bool previousBtnState = 1;
 uint32_t timer = 0;
 
 bool startGPXFile(File &f, char *fileName){
-
+  if (!GPS.fix){
+    Serial.println("Failed to start log, no fix");
+    return;
+  }
   if (f) {
   
   //Write Header
@@ -220,3 +223,4 @@ void loop()
   }
 
 }
+
